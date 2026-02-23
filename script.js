@@ -2,27 +2,24 @@
 const API_KEY = 'e5efa04a8d3803aeab052973807c017d';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
-const PLACEHOLDER = 'https://via.placeholder.com/500x750?text=Affiche+Indisponible';
+const PLACEHOLDER = 'https://placehold.co/500x750?text=Affiche+Indisponible';
 
-// Variables pour la recherche
-let currentFoundMovie = null;
+// Variables globales
+let lastResults = []; // Stocke les derniers résultats de recherche
 const searchInput = document.getElementById('movie-search');
 const searchBtn = document.getElementById('search-btn');
 const resultContainer = document.querySelector('.result-card-container');
-
-// Variables pour le debounce
-let searchTimeout = null;
-
-// Éléments du DOM (ajouts)
 const ratingModal = document.getElementById('rating-modal');
 const userRatingInput = document.getElementById('user-rating');
 const userCommentInput = document.getElementById('user-comment');
 const cancelModalBtn = document.getElementById('cancel-modal');
 const saveRatingBtn = document.getElementById('save-rating');
+
+let searchTimeout = null;
 let currentMovieToFinish = null;
 
 /**
- * 1. FONCTION DE RECHERCHE (API TMDB)
+ * 1. FONCTION DE RECHERCHE
  */
 async function searchMovie() {
     const query = searchInput.value.trim();
@@ -36,49 +33,42 @@ async function searchMovie() {
         const data = await response.json();
 
         if (data.results && data.results.length > 0) {
-            // On envoie les 5 ou 6 premiers résultats pour ne pas surcharger la page
-            displaySearchResults(data.results.slice(0, 6)); 
+            lastResults = data.results.slice(0, 8); // On garde les 8 premiers
+            displaySearchResults(lastResults);
         } else {
-            resultContainer.innerHTML = '<p class="error-msg">Aucun film trouvé.</p>';
+            resultContainer.innerHTML = '<p class="empty-msg">Aucun film trouvé.</p>';
         }
     } catch (error) {
-        console.error(error);
+        console.error("Erreur API:", error);
     }
 }
-/**
- * DEBOUNCE POUR LA RECHERCHE EN TEMPS RÉEL
- */
+
+// Debounce (recherche pendant la frappe)
 searchInput.addEventListener('input', () => {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        searchMovie();
-    }, 500); // Attend 500ms après la dernière frappe
+    searchTimeout = setTimeout(() => searchMovie(), 500);
 });
 
 /**
- * 2. AFFICHER LE RÉSULTAT DE RECHERCHE
+ * 2. AFFICHER LES RÉSULTATS
  */
 function displaySearchResults(movies) {
-    // On vide le conteneur et on crée une grille pour les résultats
     resultContainer.innerHTML = `
         <div class="search-results-grid">
             ${movies.map((movie, index) => {
-                const releaseYear = movie.release_date ? movie.release_date.split('-')[0] : 'N/A';
-                const posterPath = movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : PLACEHOLDER;
+                const year = movie.release_date ? movie.release_date.split('-')[0] : 'N/A';
+                const poster = movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : PLACEHOLDER;
                 
-                // On transforme l'objet movie en chaîne de caractères sécurisée pour le bouton
-                const movieData = encodeURIComponent(JSON.stringify(movie));
-
                 return `
                     <div class="movie-card mini search-item">
                         <div class="card-image">
-                            <img src="${posterPath}" alt="${movie.title}">
+                            <img src="${poster}" alt="${movie.title}">
                             <div class="overlay-simple">⭐ ${movie.vote_average.toFixed(1)}</div>
                         </div>
                         <div class="card-info">
                             <h3>${movie.title}</h3>
-                            <p class="meta">${releaseYear}</p>
-                            <button class="add-btn-small" onclick="addFromSearch('${movieData}')">
+                            <p class="meta">${year}</p>
+                            <button class="add-btn-small" onclick="addFromSearch(${index})">
                                 <i data-lucide="plus"></i> Ajouter
                             </button>
                         </div>
@@ -87,20 +77,18 @@ function displaySearchResults(movies) {
             }).join('')}
         </div>
     `;
-
     if (window.lucide) lucide.createIcons();
 }
 
-// Nouvelle fonction pour gérer l'ajout depuis cette liste
-window.addFromSearch = function(encodedMovieData) {
-    const movie = JSON.parse(decodeURIComponent(encodedMovieData));
-    addToFirebase(movie);
+// Fonction d'ajout par index (plus de bugs de guillemets !)
+window.addFromSearch = function(index) {
+    const movie = lastResults[index];
+    if (movie) addToFirebase(movie);
 };
 
 /**
- * 3. ACTIONS FIREBASE (CLOUD)
+ * 3. ACTIONS FIREBASE
  */
-
 async function addToFirebase(movie) {
     try {
         const movieData = {
@@ -108,7 +96,7 @@ async function addToFirebase(movie) {
             poster_path: movie.poster_path,
             release_date: movie.release_date || "",
             vote_average: movie.vote_average || 0,
-            status: 'watching', // Par défaut
+            status: 'watching',
             addedAt: Date.now()
         };
 
@@ -116,7 +104,7 @@ async function addToFirebase(movie) {
         searchInput.value = "";
         resultContainer.innerHTML = "";
     } catch (e) {
-        console.error("Erreur d'ajout :", e);
+        console.error("Erreur Firebase:", e);
     }
 }
 
@@ -125,13 +113,13 @@ window.removeFromList = async function (firebaseId) {
         try {
             await window.fbActions.deleteDoc(window.fbActions.doc(window.db, "movies", firebaseId));
         } catch (e) {
-            console.error("Erreur suppression :", e);
+            console.error(e);
         }
     }
 };
 
 /**
- * LOGIQUE DE NOTATION ET STATUT "TERMINÉ"
+ * 4. MODAL & NOTATION
  */
 window.openRatingModal = function (firebaseId) {
     currentMovieToFinish = firebaseId;
@@ -145,14 +133,16 @@ cancelModalBtn.addEventListener('click', () => {
 
 saveRatingBtn.addEventListener('click', async () => {
     if (!currentMovieToFinish) return;
-
+    
     const userRating = userRatingInput.value;
     const userComment = userCommentInput.value;
 
     try {
-        // Mise à jour du document dans Firebase
-        const { updateDoc, doc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
-        const movieRef = doc(window.db, "movies", currentMovieToFinish);
+        const movieRef = window.fbActions.doc(window.db, "movies", currentMovieToFinish);
+        
+        // Import dynamique si nécessaire ou utilisation de fbActions si tu l'as complété
+        // Ici on utilise directement le doc déjà présent
+        const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
 
         await updateDoc(movieRef, {
             status: 'finished',
@@ -166,20 +156,16 @@ saveRatingBtn.addEventListener('click', async () => {
         userCommentInput.value = "";
         currentMovieToFinish = null;
     } catch (e) {
-        console.error("Erreur mise à jour :", e);
+        console.error(e);
     }
 });
 
 /**
- * 4. SYNCHRONISATION TEMPS RÉEL
+ * 5. SYNCHRONISATION
  */
 function initRealtimeSync() {
     window.fbActions.onSnapshot(window.moviesCol, (snapshot) => {
-        const movies = snapshot.docs.map(doc => ({
-            fbId: doc.id,
-            ...doc.data()
-        }));
-
+        const movies = snapshot.docs.map(doc => ({ fbId: doc.id, ...doc.data() }));
         movies.sort((a, b) => b.addedAt - a.addedAt);
         renderUIList(movies);
     });
@@ -188,7 +174,6 @@ function initRealtimeSync() {
 function renderUIList(movies) {
     const myListGrid = document.querySelector('.movie-grid');
     const countSpan = document.querySelector('.count');
-
     countSpan.textContent = `${movies.length} film${movies.length > 1 ? 's' : ''}`;
 
     if (movies.length === 0) {
@@ -218,7 +203,7 @@ function renderUIList(movies) {
                         </button>
                     ` : `
                         <div class="user-review">
-                            <div class="user-score">Ma note : ${movie.userRating || '?'}/10</div>
+                            <div class="user-score">Note : ${movie.userRating || '?'}/10</div>
                             ${movie.userComment ? `<div class="user-comment">"${movie.userComment}"</div>` : ''}
                         </div>
                     `}
@@ -226,14 +211,10 @@ function renderUIList(movies) {
             </div>
         `;
     }).join('');
-
     if (window.lucide) lucide.createIcons();
 }
 
-// Initialisation
-searchBtn.addEventListener('click', searchMovie);
-searchInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchMovie(); });
-
+// Lancement
 const checkFB = setInterval(() => {
     if (window.db) {
         clearInterval(checkFB);
