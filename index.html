@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CinéList - Votre collection de films personnels</title>
+    <title>Perfect Movie | Film nay sy Mimi </title>
     <meta name="description" content="Découvrez, recherchez et organisez votre liste de films préférés avec CinéList.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,13 +19,13 @@
     <header>
         <div class="logo">
             <i data-lucide="clapperboard"></i>
-            <span>CinéList</span>
+            <span>Perfect Movie</span>
         </div>
     </header>
 
     <main>
         <section id="search-section" class="hero">
-            <h1>Trouvez votre prochain <span>film</span></h1>
+            <h1>Trouvons notre prochain <span>film</span></h1>
             <div class="search-container">
                 <div class="search-wrapper">
                     <i data-lucide="search" class="search-icon"></i>
@@ -38,98 +38,43 @@
         <section id="search-result" class="section">
             <h2 class="section-title">Résultat de la recherche</h2>
             <div class="result-card-container">
-                <!-- Example Search Result Card -->
-                <div class="movie-card featured">
-                    <div class="card-image">
-                        <img src="movie_posters_collection.png" alt="Affiche du film">
-                        <div class="overlay">
-                            <span class="rating"><i data-lucide="star"></i> 8.5</span>
-                        </div>
-                    </div>
-                    <div class="card-info">
-                        <h3>Interstellar</h3>
-                        <p class="genre">Science-Fiction • 2014</p>
-                        <p class="description">Une équipe d'explorateurs voyage au-delà de cette galaxie pour découvrir
-                            si l'humanité a un avenir...</p>
-                        <button class="add-btn"><i data-lucide="plus"></i> Ajouter à ma liste</button>
-                    </div>
-                </div>
+
             </div>
         </section>
 
         <section id="my-list" class="section">
             <div class="section-header">
-                <h2 class="section-title">Ma Liste</h2>
+                <h2 class="section-title">Notre Liste</h2>
                 <span class="count">4 films</span>
             </div>
 
             <div class="movie-grid">
-                <!-- Movie Item 1 -->
-                <div class="movie-card mini">
-                    <div class="card-image">
-                        <img src="movie_posters_collection.png" alt="Affiche">
-                        <button class="remove-btn"><i data-lucide="x"></i></button>
-                    </div>
-                    <div class="card-info">
-                        <h3>Inception</h3>
-                        <div class="meta">
-                            <span>2010</span>
-                            <span class="rating">⭐ 8.8</span>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Movie Item 2 -->
-                <div class="movie-card mini">
-                    <div class="card-image">
-                        <img src="movie_posters_collection.png" alt="Affiche">
-                        <button class="remove-btn"><i data-lucide="x"></i></button>
-                    </div>
-                    <div class="card-info">
-                        <h3>The Dark Knight</h3>
-                        <div class="meta">
-                            <span>2008</span>
-                            <span class="rating">⭐ 9.0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Movie Item 3 -->
-                <div class="movie-card mini">
-                    <div class="card-image">
-                        <img src="movie_posters_collection.png" alt="Affiche">
-                        <button class="remove-btn"><i data-lucide="x"></i></button>
-                    </div>
-                    <div class="card-info">
-                        <h3>Parasite</h3>
-                        <div class="meta">
-                            <span>2019</span>
-                            <span class="rating">⭐ 8.5</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Movie Item 4 -->
-                <div class="movie-card mini">
-                    <div class="card-image">
-                        <img src="movie_posters_collection.png" alt="Affiche">
-                        <button class="remove-btn"><i data-lucide="x"></i></button>
-                    </div>
-                    <div class="card-info">
-                        <h3>The Godfather</h3>
-                        <div class="meta">
-                            <span>1972</span>
-                            <span class="rating">⭐ 9.2</span>
-                        </div>
-                    </div>
-                </div>
             </div>
         </section>
     </main>
 
     <footer>
-        <p>&copy; 2024 CinéList - Conçu avec passion pour les amoureux du cinéma.</p>
+        <p>&copy; 2026 Perfect Movie - Conçu pour les couples a distance pour lister leurs films a regarder.</p>
     </footer>
+
+    <div id="rating-modal" class="modal">
+        <div class="modal-content">
+            <h2>Noter ce film</h2>
+            <div class="form-group">
+                <label for="user-rating">Notre note / 10</label>
+                <input type="number" id="user-rating" min="0" max="10" step="0.5" placeholder="8.5">
+            </div>
+            <div class="form-group">
+                <label for="user-comment">Notre commentaire</label>
+                <textarea id="user-comment" rows="3" placeholder="Qu'as-tu pensé du film ?"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button id="cancel-modal" class="cancel-btn">Annuler</button>
+                <button id="save-rating" class="save-btn">Enregistrer</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
