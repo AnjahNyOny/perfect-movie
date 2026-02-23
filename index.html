@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CinéList - Votre collection de films personnels</title>
+    <meta name="description" content="Découvrez, recherchez et organisez votre liste de films préférés avec CinéList.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="glow-bg"></div>
+
+    <header>
+        <div class="logo">
+            <i data-lucide="clapperboard"></i>
+            <span>CinéList</span>
+        </div>
+    </header>
+
+    <main>
+        <section id="search-section" class="hero">
+            <h1>Trouvez votre prochain <span>film</span></h1>
+            <div class="search-container">
+                <div class="search-wrapper">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="movie-search" placeholder="Rechercher un film (ex: Inception, Avatar...)">
+                    <button id="search-btn">Rechercher</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="search-result" class="section">
+            <h2 class="section-title">Résultat de la recherche</h2>
+            <div class="result-card-container">
+                <!-- Example Search Result Card -->
+                <div class="movie-card featured">
+                    <div class="card-image">
+                        <img src="movie_posters_collection.png" alt="Affiche du film">
+                        <div class="overlay">
+                            <span class="rating"><i data-lucide="star"></i> 8.5</span>
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <h3>Interstellar</h3>
+                        <p class="genre">Science-Fiction • 2014</p>
+                        <p class="description">Une équipe d'explorateurs voyage au-delà de cette galaxie pour découvrir
+                            si l'humanité a un avenir...</p>
+                        <button class="add-btn"><i data-lucide="plus"></i> Ajouter à ma liste</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="my-list" class="section">
+            <div class="section-header">
+                <h2 class="section-title">Ma Liste</h2>
+                <span class="count">4 films</span>
+            </div>
+
+            <div class="movie-grid">
+                <!-- Movie Item 1 -->
+                <div class="movie-card mini">
+                    <div class="card-image">
+                        <img src="movie_posters_collection.png" alt="Affiche">
+                        <button class="remove-btn"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="card-info">
+                        <h3>Inception</h3>
+                        <div class="meta">
+                            <span>2010</span>
+                            <span class="rating">⭐ 8.8</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Movie Item 2 -->
+                <div class="movie-card mini">
+                    <div class="card-image">
+                        <img src="movie_posters_collection.png" alt="Affiche">
+                        <button class="remove-btn"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="card-info">
+                        <h3>The Dark Knight</h3>
+                        <div class="meta">
+                            <span>2008</span>
+                            <span class="rating">⭐ 9.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Movie Item 3 -->
+                <div class="movie-card mini">
+                    <div class="card-image">
+                        <img src="movie_posters_collection.png" alt="Affiche">
+                        <button class="remove-btn"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="card-info">
+                        <h3>Parasite</h3>
+                        <div class="meta">
+                            <span>2019</span>
+                            <span class="rating">⭐ 8.5</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Movie Item 4 -->
+                <div class="movie-card mini">
+                    <div class="card-image">
+                        <img src="movie_posters_collection.png" alt="Affiche">
+                        <button class="remove-btn"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="card-info">
+                        <h3>The Godfather</h3>
+                        <div class="meta">
+                            <span>1972</span>
+                            <span class="rating">⭐ 9.2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 CinéList - Conçu avec passion pour les amoureux du cinéma.</p>
+    </footer>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Ta configuration que tu viens de m'envoyer
+        const firebaseConfig = {
+            apiKey: "AIzaSyANkXoY6Ac7jYUl2N3Dnb8IXSebbXRe1Fo",
+            authDomain: "perfect-movie.firebaseapp.com",
+            projectId: "perfect-movie",
+            storageBucket: "perfect-movie.firebasestorage.app",
+            messagingSenderId: "947169874144",
+            appId: "1:947169874144:web:e7658c334c30c228f10085"
+        };
+
+        // Initialisation de Firebase et Firestore
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const moviesCol = collection(db, 'movies');
+
+        // TRÈS IMPORTANT : On "donne" ces outils à notre fichier script.js
+        window.db = db;
+        window.moviesCol = moviesCol;
+        window.fbActions = { addDoc, onSnapshot, deleteDoc, doc };
+
+        console.log("Firebase est connecté !");
+    </script>
+
+    <script src="script.js"></script>
+    <script>
+        // Initialiser Lucide Icons
+        lucide.createIcons();
+    </script>
+
+</body>
+
+</html>
