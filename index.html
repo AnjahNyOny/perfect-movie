@@ -8,23 +8,54 @@
     <meta name="description" content="Découvrez, recherchez et organisez votre liste de films préférés avec CinéList.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;600;800&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/svg+xml" href="ar-white.svg">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
 <body>
-    <div class="glow-bg"></div>
+
 
     <header>
         <div class="logo">
             <i data-lucide="clapperboard"></i>
             <span>Perfect Movie</span>
         </div>
+        <div class="header-right">
+            <button id="theme-toggle" class="theme-toggle">
+                <i data-lucide="sun"></i>
+            </button>
+            <div class="auth-controls" id="auth-controls">
+                <!-- Dynamically populated by JS -->
+                <button id="login-open-btn" class="login-trigger">Connexion</button>
+            </div>
+        </div>
     </header>
 
     <main>
+        <!-- Stats Dashboard -->
+        <div id="stats-dashboard" class="stats-row" style="display: none;">
+            <div class="stat-card">
+                <span class="stat-label">Total Films</span>
+                <span id="stat-total" class="stat-value">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Temps de Visionnage</span>
+                <span id="stat-time" class="stat-value">0h</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Genre Préféré</span>
+                <span id="stat-genre" class="stat-value">-</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Top Contributeur</span>
+                <span id="stat-user" class="stat-value">-</span>
+            </div>
+        </div>
+
         <section id="search-section" class="hero">
             <h1>Trouvons notre prochain <span>film</span></h1>
             <div class="search-container">
@@ -46,7 +77,40 @@
         <section id="my-list" class="section">
             <div class="section-header">
                 <h2 class="section-title">Notre Liste</h2>
-                <span class="count">4 films</span>
+                <div class="header-actions">
+                    <button id="random-btn" class="surprise-btn">
+                        <i data-lucide="shuffle"></i> Surprise-moi !
+                    </button>
+                    <span class="count">0 films</span>
+                </div>
+            </div>
+
+            <div class="filters-bar">
+                <div class="search-mini">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="local-search" placeholder="Filtrer par titre...">
+                </div>
+                <div class="filter-group">
+                    <select id="genre-filter">
+                        <option value="all">Tous les genres</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="status-filter">
+                        <option value="all">Tous les statuts</option>
+                        <option value="watching">À voir</option>
+                        <option value="finished">Terminés</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <select id="sort-filter">
+                        <option value="addedAt-desc">Plus récents</option>
+                        <option value="addedAt-asc">Plus anciens</option>
+                        <option value="userRating-desc">Mieux notés (Mimi & Me)</option>
+                        <option value="vote_average-desc">Mieux notés (Public)</option>
+                        <option value="title-asc">A-Z</option>
+                    </select>
+                </div>
             </div>
 
             <div class="movie-grid">
@@ -58,6 +122,31 @@
     <footer>
         <p>&copy; 2026 Perfect Movie - Conçu pour les couples a distance pour lister leurs films a regarder.</p>
     </footer>
+
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <div class="auth-tabs">
+                <button id="tab-login" class="active">Connexion</button>
+                <button id="tab-signup">Inscription</button>
+            </div>
+
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="auth-email">Email</label>
+                    <input type="email" id="auth-email" placeholder="votre@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Mot de passe</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" required>
+                </div>
+                <div id="auth-error" class="error-msg"></div>
+                <div class="modal-actions">
+                    <button type="button" id="close-auth" class="cancel-btn">Fermer</button>
+                    <button type="submit" id="auth-submit" class="save-btn">Se connecter</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div id="rating-modal" class="modal">
         <div class="modal-content">
@@ -77,11 +166,25 @@
         </div>
     </div>
 
+    <div id="random-modal" class="modal">
+        <div class="modal-content random-content">
+            <h2 class="random-title">✨ Le destin a choisi...</h2>
+            <div id="random-result-container">
+                <!-- Result here -->
+            </div>
+            <div class="modal-actions">
+                <button id="close-random" class="cancel-btn">Fermer</button>
+                <button id="reshuffle-btn" class="save-btn">Relancer</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        // Ta configuration que tu viens de m'envoyer
+        // Ta configuration
         const firebaseConfig = {
             apiKey: "AIzaSyANkXoY6Ac7jYUl2N3Dnb8IXSebbXRe1Fo",
             authDomain: "perfect-movie.firebaseapp.com",
@@ -91,20 +194,33 @@
             appId: "1:947169874144:web:e7658c334c30c228f10085"
         };
 
-        // Initialisation de Firebase et Firestore
+        // Initialisation de Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+        const auth = getAuth(app);
         const moviesCol = collection(db, 'movies');
 
-        // TRÈS IMPORTANT : On "donne" ces outils à notre fichier script.js
+        // Export pour script.js
         window.db = db;
+        window.auth = auth;
         window.moviesCol = moviesCol;
-        window.fbActions = { addDoc, onSnapshot, deleteDoc, doc };
+        window.fbActions = { addDoc, onSnapshot, deleteDoc, doc, query, orderBy };
+        window.authActions = { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut };
 
-        console.log("Firebase est connecté !");
+        console.log("Firebase & Auth connectés !");
     </script>
 
-    <script src="script.js"></script>
+    <!-- Modal: Trailer -->
+    <div id="trailer-modal" class="modal">
+        <div class="modal-content trailer-content">
+            <div id="trailer-container"></div>
+            <div class="modal-actions">
+                <button id="close-trailer" class="cancel-btn">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
     <script>
         // Initialiser Lucide Icons
         lucide.createIcons();
