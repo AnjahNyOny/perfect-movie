@@ -103,30 +103,42 @@ async function fetchGenres() {
 /**
  * AUTH & COUPLE LOGIC
  */
+/**
+ * AUTH & COUPLE LOGIC
+ */
 function initAuth() {
     initTheme();
 
     window.authActions.onAuthStateChanged(window.auth, async (user) => {
         currentUser = user;
         if (user) {
-            const userRef = window.fbActions.doc(window.db, 'users', user.uid);
-            const userSnap = await window.fbActions.getDoc(userRef);
+            try {
+                const userRef = window.fbActions.doc(window.db, 'users', user.uid);
+                const userSnap = await window.fbActions.getDoc(userRef);
 
-            if (userSnap.exists()) {
-                currentCoupleId = userSnap.data().coupleId;
-            } else {
-                currentCoupleId = user.uid;
-                await window.fbActions.setDoc(userRef, { email: user.email, coupleId: currentCoupleId });
+                if (userSnap.exists()) {
+                    currentCoupleId = userSnap.data().coupleId;
+                } else {
+                    currentCoupleId = user.uid;
+                    await window.fbActions.setDoc(userRef, { email: user.email, coupleId: currentCoupleId });
+                }
+
+                // Vérifie si on est en couple (AVEC PROTECTION TRY/CATCH)
+                let isPaired = false;
+                try {
+                    const qUsers = window.fbActions.query(window.usersCol, window.fbActions.where('coupleId', '==', currentCoupleId));
+                    const snapUsers = await window.fbActions.getDocs(qUsers);
+                    isPaired = snapUsers.size > 1;
+                } catch (dbError) {
+                    console.warn("Vérification du couple ignorée (Erreur Firebase) :", dbError);
+                }
+
+                updateAuthUI(isPaired);
+                initRealtimeSync();
+                fetchGenres();
+            } catch (globalError) {
+                console.error("Erreur critique de connexion :", globalError);
             }
-
-            // NOUVEAU: Vérifie si on est en couple (plus d'un utilisateur partage ce coupleId)
-            const qUsers = window.fbActions.query(window.usersCol, window.fbActions.where('coupleId', '==', currentCoupleId));
-            const snapUsers = await window.fbActions.getDocs(qUsers);
-            const isPaired = snapUsers.size > 1;
-
-            updateAuthUI(isPaired);
-            initRealtimeSync();
-            fetchGenres();
         } else {
             currentCoupleId = null;
             allMovies = [];
@@ -175,7 +187,6 @@ function initAuth() {
         alert("Code copié !");
     });
 
-    // NOUVEAU: Bouton pour copier le lien public
     document.getElementById('copy-share-btn').addEventListener('click', () => {
         const linkInput = document.getElementById('public-share-link');
         linkInput.select();
@@ -191,7 +202,6 @@ function initAuth() {
                 await window.fbActions.setDoc(userRef, { coupleId: newCode }, { merge: true });
                 currentCoupleId = newCode;
 
-                // Mettre à jour l'UI vers l'état partagé
                 updateAuthUI(true);
                 alert("Super ! Tu as rejoint la liste !");
                 initRealtimeSync();
