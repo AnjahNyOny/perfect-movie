@@ -660,7 +660,10 @@ function renderUIList(movies) {
 /**
  * STARTUP LOGIC
  */
-
+// Initialiser les icônes une fois que tout est chargé
+window.addEventListener('DOMContentLoaded', () => {
+    if (window.lucide) lucide.createIcons();
+});
 initTheme();
 
 // Vérifier si un lien de partage a été utilisé
