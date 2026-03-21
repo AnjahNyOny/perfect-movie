@@ -4,16 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perfect Movie | Film nay sy Mimi </title>
-    <meta name="description" content="Découvrez, recherchez et organisez votre liste de films préférés avec CinéList.">
+    <title>Perfect Movie | Liste de films pour couple</title>
+    <meta name="description"
+        content="Découvrez, recherchez et organisez votre liste de films préférés en couple ou entre amis.">
+
+    <meta property="og:title" content="Perfect Movie | Notre Liste de Films">
+    <meta property="og:description" content="Découvrez les films que nous avons prévus de regarder !">
+    <meta property="og:type" content="website">
+
+    <meta name="referrer" content="no-referrer">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;600;800&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link rel="icon" type="image/svg+xml" href="ar-white.svg">
-    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script src="https://unpkg.com/lucide@latest" defer></script>
 </head>
 
 <body>
@@ -24,34 +32,52 @@
             <span>Perfect Movie</span>
         </div>
         <div class="header-right">
-            <button id="theme-toggle" class="theme-toggle">
-                <i data-lucide="sun"></i>
-            </button>
-            <div class="auth-controls" id="auth-controls">
-                <button id="login-open-btn" class="login-trigger">Connexion</button>
-            </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème (clair/sombre)">
+                <div class="auth-controls" id="auth-controls">
+                    <button id="login-open-btn" class="login-trigger">Connexion</button>
+                </div>
         </div>
     </header>
 
     <main>
-        <div id="couple-dashboard" class="section" style="display: none; background: var(--surface, #1e1e2f); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border, #333);">
-            <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 1.1rem;">Gérer notre liste commune</h3>
-            <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+        <div id="couple-dashboard" class="section"
+            style="display: none; background: var(--surface, #1e1e2f); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border, #333);">
+
+            <div id="pairing-ui" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
                 <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 5px;">
-                    <label style="font-size: 0.9rem; color: #888;">Mon code (à partager) :</label>
+                    <label style="font-size: 0.9rem; color: #888;">Mon code (à envoyer au partenaire) :</label>
                     <div style="display: flex; gap: 10px;">
-                        <input type="text" id="my-couple-code" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a3c; color: #fff;" readonly>
-                        <button id="copy-code-btn" class="surprise-btn" style="white-space: nowrap;"><i data-lucide="copy"></i> Copier</button>
+                        <input type="text" id="my-couple-code"
+                            style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a3c; color: #fff;"
+                            readonly>
+                        <button id="copy-code-btn" class="surprise-btn" style="white-space: nowrap;"><i
+                                data-lucide="copy"></i> Copier</button>
                     </div>
                 </div>
                 <div style="flex: 1; min-width: 250px; display: flex; flex-direction: column; gap: 5px;">
                     <label style="font-size: 0.9rem; color: #888;">Rejoindre la liste du partenaire :</label>
                     <div style="display: flex; gap: 10px;">
-                        <input type="text" id="join-couple-code" placeholder="Coller le code ici" style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a3c; color: #fff;">
-                        <button id="join-code-btn" class="save-btn" style="white-space: nowrap;"><i data-lucide="link"></i> Lier</button>
+                        <input type="text" id="join-couple-code" placeholder="Coller le code ici"
+                            style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a3c; color: #fff;">
+                        <button id="join-code-btn" class="save-btn" style="white-space: nowrap;"><i
+                                data-lucide="link"></i> Lier</button>
                     </div>
                 </div>
             </div>
+
+            <div id="public-share-ui" style="display: none; flex-direction: column; gap: 10px;">
+                <h3 style="margin-top: 0; font-size: 1.1rem; color: var(--accent);">💖 Partenaire lié avec succès !</h3>
+                <label style="font-size: 0.9rem; color: #888;">Partage ce lien avec tes amis pour qu'ils voient votre
+                    liste (en lecture seule) :</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="public-share-link"
+                        style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2a2a3c; color: #fff;"
+                        readonly>
+                    <button id="copy-share-btn" class="surprise-btn" style="white-space: nowrap;"><i
+                            data-lucide="share-2"></i> Copier le lien</button>
+                </div>
+            </div>
+
         </div>
 
         <div id="stats-dashboard" class="stats-row" style="display: none;">
@@ -78,7 +104,8 @@
             <div class="search-container">
                 <div class="search-wrapper">
                     <i data-lucide="search" class="search-icon"></i>
-                    <input type="text" id="movie-search" placeholder="Rechercher un film (ex: Inception, Avatar...)">
+                    <input type="text" id="movie-search" placeholder="Rechercher un film..."
+                        aria-label="Rechercher un film">
                     <button id="search-btn">Rechercher</button>
                 </div>
             </div>
@@ -103,22 +130,25 @@
             <div class="filters-bar">
                 <div class="search-mini">
                     <i data-lucide="search"></i>
-                    <input type="text" id="local-search" placeholder="Filtrer par titre...">
+                    <input type="text" id="local-search" placeholder="Filtrer par titre..."
+                        aria-label="Filtrer la liste par titre">
                 </div>
                 <div class="filter-group">
-                    <select id="genre-filter">
+                    <select id="genre-filter" aria-label="Filtrer par genre">
                         <option value="all">Tous les genres</option>
                     </select>
                 </div>
                 <div class="filter-group">
-                    <select id="status-filter">
+                    <select id="status-filter" aria-label="Filtrer par statut">
+
                         <option value="all">Tous les statuts</option>
                         <option value="watching">À voir</option>
                         <option value="finished">Terminés</option>
                     </select>
                 </div>
                 <div class="filter-group">
-                    <select id="sort-filter">
+                    <select id="sort-filter" aria-label="Trier la liste">
+
                         <option value="addedAt-desc">Plus récents</option>
                         <option value="addedAt-asc">Plus anciens</option>
                         <option value="userRating-desc">Mieux notés (Nous)</option>
@@ -200,8 +230,8 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        // Ajout de where, getDoc, setDoc
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        // Ajout de getDocs à la liste
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
@@ -216,14 +246,14 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        
+
         window.db = db;
         window.auth = auth;
         window.moviesCol = collection(db, 'movies');
         window.usersCol = collection(db, 'users');
-        
-        // Export des actions incluant getDoc, setDoc et where
-        window.fbActions = { addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, setDoc };
+
+        // On exporte getDocs
+        window.fbActions = { addDoc, onSnapshot, deleteDoc, doc, query, orderBy, where, getDoc, setDoc, getDocs };
         window.authActions = { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut };
 
         console.log("Firebase & Auth connectés !");
@@ -234,4 +264,5 @@
         lucide.createIcons();
     </script>
 </body>
+
 </html>

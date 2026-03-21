@@ -7,10 +7,11 @@ const PLACEHOLDER = 'https://placehold.co/500x750?text=Affiche+Indisponible';
 // Variables globales
 let lastResults = [];
 let currentUser = null;
-let currentCoupleId = null; // NOUVEAU: Stocke l'ID partagé du couple
+let currentCoupleId = null;
 let currentMovieToFinish = null;
 let searchTimeout = null;
 let genreMap = {};
+window.isReadOnly = false; // NOUVEAU : Mode lecture seule
 
 // Elements du DOM...
 const trailerModal = document.getElementById('trailer-modal');
@@ -52,7 +53,7 @@ const tabSignup = document.getElementById('tab-signup');
 const closeAuthBtn = document.getElementById('close-auth');
 const loginOpenBtn = document.getElementById('login-open-btn');
 
-let authMode = 'login'; 
+let authMode = 'login';
 
 /**
  * THEME MANAGEMENT
@@ -108,26 +109,29 @@ function initAuth() {
     window.authActions.onAuthStateChanged(window.auth, async (user) => {
         currentUser = user;
         if (user) {
-            // NOUVEAU: Récupérer ou créer le profil utilisateur pour le Code Couple
             const userRef = window.fbActions.doc(window.db, 'users', user.uid);
             const userSnap = await window.fbActions.getDoc(userRef);
 
             if (userSnap.exists()) {
                 currentCoupleId = userSnap.data().coupleId;
             } else {
-                // Si c'est un nouveau compte, le coupleId par défaut est son UID
                 currentCoupleId = user.uid;
                 await window.fbActions.setDoc(userRef, { email: user.email, coupleId: currentCoupleId });
             }
 
-            updateAuthUI();
+            // NOUVEAU: Vérifie si on est en couple (plus d'un utilisateur partage ce coupleId)
+            const qUsers = window.fbActions.query(window.usersCol, window.fbActions.where('coupleId', '==', currentCoupleId));
+            const snapUsers = await window.fbActions.getDocs(qUsers);
+            const isPaired = snapUsers.size > 1;
+
+            updateAuthUI(isPaired);
             initRealtimeSync();
             fetchGenres();
         } else {
             currentCoupleId = null;
             allMovies = [];
             renderUIList([]);
-            updateAuthUI();
+            updateAuthUI(false);
         }
     });
 
@@ -163,25 +167,34 @@ function initAuth() {
         }
     });
 
-    // Gestion des boutons du Code Couple
+    // Gestion des boutons
     document.getElementById('copy-code-btn').addEventListener('click', () => {
         const codeInput = document.getElementById('my-couple-code');
         codeInput.select();
         document.execCommand('copy');
-        alert("Code copié ! Envoie-le à ton/ta partenaire.");
+        alert("Code copié !");
+    });
+
+    // NOUVEAU: Bouton pour copier le lien public
+    document.getElementById('copy-share-btn').addEventListener('click', () => {
+        const linkInput = document.getElementById('public-share-link');
+        linkInput.select();
+        document.execCommand('copy');
+        alert("Lien de partage copié ! Tes amis peuvent maintenant voir votre liste.");
     });
 
     document.getElementById('join-code-btn').addEventListener('click', async () => {
         const newCode = document.getElementById('join-couple-code').value.trim();
         if (newCode && newCode !== currentCoupleId) {
-            if(confirm("Attention : en rejoignant cette liste, tu ne verras plus ta liste actuelle. Continuer ?")) {
+            if (confirm("Attention : en rejoignant cette liste, tu ne verras plus ta liste actuelle. Continuer ?")) {
                 const userRef = window.fbActions.doc(window.db, 'users', currentUser.uid);
                 await window.fbActions.setDoc(userRef, { coupleId: newCode }, { merge: true });
                 currentCoupleId = newCode;
-                document.getElementById('my-couple-code').value = currentCoupleId;
-                document.getElementById('join-couple-code').value = "";
+
+                // Mettre à jour l'UI vers l'état partagé
+                updateAuthUI(true);
                 alert("Super ! Tu as rejoint la liste !");
-                initRealtimeSync(); // Recharge la liste avec le nouveau code
+                initRealtimeSync();
             }
         }
     });
@@ -200,7 +213,8 @@ function setAuthMode(mode) {
     }
 }
 
-function updateAuthUI() {
+// NOUVEAU: Prend en paramètre "isPaired" pour basculer l'interface
+function updateAuthUI(isPaired = false) {
     if (currentUser) {
         const email = currentUser.email;
         const avatarUrl = `https://api.dicebear.com/7.x/bottts-neutral/svg?seed=${encodeURIComponent(email)}`;
@@ -215,10 +229,23 @@ function updateAuthUI() {
                 </div>
             </div>
         `;
-        
+
         searchSection.style.display = 'block';
         coupleDashboard.style.display = 'block';
-        document.getElementById('my-couple-code').value = currentCoupleId || currentUser.uid;
+
+        // Bascule entre l'écran de code et l'écran de partage public
+        if (isPaired) {
+            document.getElementById('pairing-ui').style.display = 'none';
+            document.getElementById('public-share-ui').style.display = 'flex';
+
+            // On construit le lien dynamique
+            const shareUrl = `${window.location.origin}${window.location.pathname}?view=${currentCoupleId}`;
+            document.getElementById('public-share-link').value = shareUrl;
+        } else {
+            document.getElementById('pairing-ui').style.display = 'flex';
+            document.getElementById('public-share-ui').style.display = 'none';
+            document.getElementById('my-couple-code').value = currentCoupleId || currentUser.uid;
+        }
 
     } else {
         authControls.innerHTML = `<button id="login-open-btn" class="login-trigger">Connexion</button>`;
@@ -238,7 +265,7 @@ window.logout = () => {
  * SEARCH & API
  */
 async function searchMovie() {
-    if (!currentUser) return;
+    if (!currentUser || window.isReadOnly) return;
     const query = searchInput.value.trim();
     if (!query) {
         resultContainer.innerHTML = "";
@@ -255,7 +282,7 @@ async function searchMovie() {
         const response = await fetch(`${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=fr-FR`);
         const data = await response.json();
         const searchResultSection = document.getElementById('search-result');
-        
+
         if (data.results && data.results.length > 0) {
             searchResultSection.style.display = 'block';
             lastResults = data.results.slice(0, 8);
@@ -284,17 +311,17 @@ function displaySearchResults(movies) {
         return `
                     <div class="movie-card mini search-item">
                         <div class="card-image">
-                            <img src="${poster}" alt="${movie.title}">
+                            <img src="${poster}" alt="Affiche du film ${movie.title}" width="500" height="750" loading="lazy" decoding="async">
                             <div class="overlay-simple">⭐ ${movie.vote_average.toFixed(1)}</div>
                         </div>
                         <div class="card-info">
                             <h3>${movie.title}</h3>
                             <p class="meta">${year}</p>
                             <div class="card-actions">
-                                <button class="add-btn-small" onclick="addFromSearch(${index})">
+                                <button class="add-btn-small" onclick="addFromSearch(${index})" aria-label="Ajouter ${movie.title}">
                                     <i data-lucide="plus"></i> Ajouter
                                 </button>
-                                <button class="trailer-btn" onclick="openTrailer('${movie.id}')">
+                                <button class="trailer-btn" onclick="openTrailer('${movie.id}')" aria-label="Voir la bande-annonce de ${movie.title}">
                                     <i data-lucide="play"></i> Trailer
                                 </button>
                             </div>
@@ -308,6 +335,7 @@ function displaySearchResults(movies) {
 }
 
 window.addFromSearch = function (index) {
+    if (window.isReadOnly) return;
     const movie = lastResults[index];
     if (movie) addToFirebase(movie);
 };
@@ -364,7 +392,7 @@ closeTrailerBtn.addEventListener('click', () => {
  * FIREBASE ACTIONS
  */
 async function addToFirebase(movie) {
-    if (!currentUser || !currentCoupleId) return;
+    if (!currentUser || !currentCoupleId || window.isReadOnly) return;
     try {
         const movieData = {
             title: movie.title,
@@ -375,7 +403,7 @@ async function addToFirebase(movie) {
             addedAt: Date.now(),
             addedBy: currentUser.email,
             addedById: currentUser.uid,
-            coupleId: currentCoupleId, // NOUVEAU: On associe le film au couple !
+            coupleId: currentCoupleId,
             genre_ids: movie.genre_ids || [],
             genres: (movie.genre_ids || []).map(id => genreMap[id] || 'Autre'),
             tmdbId: movie.id
@@ -391,7 +419,7 @@ async function addToFirebase(movie) {
 }
 
 window.removeFromList = async function (firebaseId) {
-    if (!currentUser) return;
+    if (!currentUser || window.isReadOnly) return;
     if (confirm("Supprimer ce film de la liste ?")) {
         try {
             await window.fbActions.deleteDoc(window.fbActions.doc(window.db, "movies", firebaseId));
@@ -405,6 +433,7 @@ window.removeFromList = async function (firebaseId) {
  * MODAL & RATING
  */
 window.openRatingModal = function (firebaseId) {
+    if (window.isReadOnly) return;
     currentMovieToFinish = firebaseId;
     ratingModal.classList.add('active');
 };
@@ -415,7 +444,7 @@ cancelModalBtn.addEventListener('click', () => {
 });
 
 saveRatingBtn.addEventListener('click', async () => {
-    if (!currentMovieToFinish || !currentUser) return;
+    if (!currentMovieToFinish || !currentUser || window.isReadOnly) return;
 
     const userRating = parseFloat(userRatingInput.value);
     const userComment = userCommentInput.value;
@@ -477,7 +506,7 @@ sortFilterSelect.addEventListener('change', (e) => { currentSort = e.target.valu
 function pickRandom() {
     const toWatch = allMovies.filter(m => m.status === 'watching');
     if (toWatch.length === 0) {
-        alert("Ajoute des films à voir d'abord !");
+        alert("Aucun film à voir dans la liste !");
         return;
     }
     const winner = toWatch[Math.floor(Math.random() * toWatch.length)];
@@ -485,7 +514,7 @@ function pickRandom() {
     randomResultContainer.innerHTML = `
         <div class="movie-card mini">
             <div class="card-image">
-                <img src="${poster}" alt="${winner.title}">
+                <img src="${poster}" alt="Affiche du film ${winner.title}" width="500" height="750" loading="lazy" decoding="async">
             </div>
             <div class="card-info">
                 <h3>${winner.title}</h3>
@@ -512,9 +541,8 @@ function initRealtimeSync() {
     if (unsubscribeSync) unsubscribeSync();
     if (!currentCoupleId) return;
 
-    // NOUVEAU: Requête filtrée par coupleId !
     const q = window.fbActions.query(
-        window.moviesCol, 
+        window.moviesCol,
         window.fbActions.where('coupleId', '==', currentCoupleId),
         window.fbActions.orderBy('addedAt', 'desc')
     );
@@ -553,7 +581,7 @@ function updateStats() {
     });
     const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
     const topUser = Object.entries(userCounts).sort((a, b) => b[1] - a[1])[0];
-    
+
     document.getElementById('stat-genre').textContent = topGenre ? topGenre[0] : '-';
     document.getElementById('stat-user').textContent = topUser ? topUser[0] : '-';
 }
@@ -564,7 +592,7 @@ function renderUIList(movies) {
     const countSpan = document.querySelector('.count');
     countSpan.textContent = `${movies.length} film${movies.length > 1 ? 's' : ''}`;
 
-    if (!currentUser) {
+    if (!currentUser && !window.isReadOnly) {
         myListGrid.innerHTML = '<p class="empty-msg">Connectez-vous pour voir notre liste.</p>';
         return;
     }
@@ -584,14 +612,19 @@ function renderUIList(movies) {
             </div>
         ` : '';
 
+        // NOUVEAU: Le bouton de suppression disparait en lecture seule
+        const removeBtnSnippet = window.isReadOnly ? '' : `
+            <button class="remove-btn" onclick="removeFromList('${movie.fbId}')" aria-label="Retirer ${movie.title} de la liste">
+                <i data-lucide="x"></i>
+            </button>
+        `;
+
         return `
             <div class="movie-card mini ${isFinished ? 'finished' : ''}">
                 <div class="card-image">
                     ${isFinished ? '<span class="finished-badge">Terminé</span>' : ''}
-                    <img src="${poster}" alt="${movie.title}">
-                    <button class="remove-btn" onclick="removeFromList('${movie.fbId}')">
-                        <i data-lucide="x"></i>
-                    </button>
+                    <img src="${poster}" alt="Affiche du film ${movie.title}" width="500" height="750" loading="lazy" decoding="async">
+                    ${removeBtnSnippet}
                     ${movie.userRating ? `<div class="mini-rating">${movie.userRating}/10</div>` : ''}
                 </div>
                 <div class="card-info">
@@ -601,19 +634,21 @@ function renderUIList(movies) {
                     
                     <div class="card-actions">
                         <button class="trailer-btn" onclick="openTrailer('${movie.tmdbId || movie.id || ''}')">
-                            <i data-lucide="play"></i> Trailer
+                            <i data-lucide="play"></i> Bande-annonce
                         </button>
 
-                        ${!isFinished ? `
+                        ${!isFinished && !window.isReadOnly ? `
                             <button class="finish-btn" onclick="openRatingModal('${movie.fbId}')">
                                 <i data-lucide="check"></i> Terminé
                             </button>
-                        ` : `
+                        ` : ''}
+                        
+                        ${isFinished ? `
                             <div class="user-review">
                                 <div class="user-score">${movie.finishedBy ? movie.finishedBy.split('@')[0] : 'Note'} : ${movie.userRating || '?'}/10</div>
                                 ${movie.userComment ? `<div class="user-comment">"${movie.userComment}"</div>` : ''}
                             </div>
-                        `}
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -623,11 +658,40 @@ function renderUIList(movies) {
 }
 
 /**
- * STARTUP
+ * STARTUP LOGIC
  */
-const checkFB = setInterval(() => {
-    if (window.auth) {
-        clearInterval(checkFB);
-        initAuth();
-    }
-}, 100);
+
+initTheme();
+
+// Vérifier si un lien de partage a été utilisé
+const urlParams = new URLSearchParams(window.location.search);
+const viewId = urlParams.get('view');
+
+if (viewId) {
+    // MODE LECTURE SEULE
+    window.isReadOnly = true;
+    currentCoupleId = viewId;
+
+    // On masque ce qui n'est pas nécessaire aux visiteurs
+    document.getElementById('auth-controls').innerHTML = '<span class="genre-tag" style="background:var(--accent); color:white; border-color:transparent;">🍿 Mode Lecture Seule</span>';
+    coupleDashboard.style.display = 'none';
+    searchSection.style.display = 'none';
+
+    // On attend que Firebase soit chargé pour récupérer la liste
+    const checkFBView = setInterval(() => {
+        if (window.fbActions) {
+            clearInterval(checkFBView);
+            initRealtimeSync();
+            fetchGenres();
+        }
+    }, 100);
+
+} else {
+    // MODE NORMAL (Avec connexion)
+    const checkFB = setInterval(() => {
+        if (window.auth) {
+            clearInterval(checkFB);
+            initAuth();
+        }
+    }, 100);
+}
