@@ -321,7 +321,7 @@ function displaySearchResults(movies) {
         return `
                     <div class="movie-card mini search-item">
                         <div class="card-image">
-                            <img src="${poster}" alt="Affiche du film ${movie.title}" width="500" height="750" loading="lazy" decoding="async">
+                            <img src="${poster}" alt="Affiche du film ..." width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">
                             <div class="overlay-simple">⭐ ${movie.vote_average.toFixed(1)}</div>
                         </div>
                         <div class="card-info">
@@ -524,7 +524,7 @@ function pickRandom() {
     randomResultContainer.innerHTML = `
         <div class="movie-card mini">
             <div class="card-image">
-                <img src="${poster}" alt="Affiche du film ${winner.title}" width="500" height="750" loading="lazy" decoding="async">
+                <img src="${poster}" alt="Affiche du film ..." width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">
             </div>
             <div class="card-info">
                 <h3>${winner.title}</h3>
@@ -633,7 +633,7 @@ function renderUIList(movies) {
             <div class="movie-card mini ${isFinished ? 'finished' : ''}">
                 <div class="card-image">
                     ${isFinished ? '<span class="finished-badge">Terminé</span>' : ''}
-                    <img src="${poster}" alt="Affiche du film ${movie.title}" width="500" height="750" loading="lazy" decoding="async">
+                    <img src="${poster}" alt="Affiche du film ..." width="500" height="750" loading="lazy" decoding="async" referrerpolicy="no-referrer">
                     ${removeBtnSnippet}
                     ${movie.userRating ? `<div class="mini-rating">${movie.userRating}/10</div>` : ''}
                 </div>
