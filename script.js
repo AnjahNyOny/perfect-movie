@@ -7,24 +7,23 @@ const PLACEHOLDER = 'https://placehold.co/500x750?text=Affiche+Indisponible';
 // Variables globales
 let lastResults = [];
 let currentUser = null;
+let currentCoupleId = null; // NOUVEAU: Stocke l'ID partagé du couple
 let currentMovieToFinish = null;
 let searchTimeout = null;
 let genreMap = {};
 
-// Trailer elements
+// Elements du DOM...
 const trailerModal = document.getElementById('trailer-modal');
 const trailerContainer = document.getElementById('trailer-container');
 const closeTrailerBtn = document.getElementById('close-trailer');
-
-// Local State for filtering
 let allMovies = [];
 let localSearchQuery = "";
 let currentGenreFilter = "all";
 let currentStatusFilter = "all";
 let currentSort = "addedAt-desc";
 
-// DOM Elements
 const searchSection = document.getElementById('search-section');
+const coupleDashboard = document.getElementById('couple-dashboard');
 const searchInput = document.getElementById('movie-search');
 const resultContainer = document.querySelector('.result-card-container');
 const ratingModal = document.getElementById('rating-modal');
@@ -32,21 +31,15 @@ const userRatingInput = document.getElementById('user-rating');
 const userCommentInput = document.getElementById('user-comment');
 const cancelModalBtn = document.getElementById('cancel-modal');
 const saveRatingBtn = document.getElementById('save-rating');
-
-// Randomizer elements
 const randomBtn = document.getElementById('random-btn');
 const randomModal = document.getElementById('random-modal');
 const randomResultContainer = document.getElementById('random-result-container');
 const closeRandomBtn = document.getElementById('close-random');
 const reshuffleBtn = document.getElementById('reshuffle-btn');
-
-// Local Filter elements
 const localSearchInput = document.getElementById('local-search');
 const genreFilterSelect = document.getElementById('genre-filter');
 const statusFilterSelect = document.getElementById('status-filter');
 const sortFilterSelect = document.getElementById('sort-filter');
-
-// Auth Elements
 const authControls = document.getElementById('auth-controls');
 const authModal = document.getElementById('auth-modal');
 const authForm = document.getElementById('auth-form');
@@ -59,16 +52,14 @@ const tabSignup = document.getElementById('tab-signup');
 const closeAuthBtn = document.getElementById('close-auth');
 const loginOpenBtn = document.getElementById('login-open-btn');
 
-let authMode = 'login'; // 'login' or 'signup'
+let authMode = 'login'; 
 
 /**
- * 0. THEME MANAGEMENT
+ * THEME MANAGEMENT
  */
 function initTheme() {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || 'dark';
-
-    // Set theme on both html and body for maximum compatibility
     document.documentElement.setAttribute('data-theme', currentTheme);
     document.body.setAttribute('data-theme', currentTheme);
     updateThemeIcon(currentTheme);
@@ -76,7 +67,6 @@ function initTheme() {
     themeToggle?.addEventListener('click', () => {
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const newTheme = isDark ? 'light' : 'dark';
-
         document.documentElement.setAttribute('data-theme', newTheme);
         document.body.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
@@ -86,14 +76,12 @@ function initTheme() {
 
 function updateThemeIcon(theme) {
     const themeToggle = document.getElementById('theme-toggle');
-    themeToggle.innerHTML = theme === 'dark'
-        ? '<i data-lucide="sun"></i>'
-        : '<i data-lucide="moon"></i>';
+    themeToggle.innerHTML = theme === 'dark' ? '<i data-lucide="sun"></i>' : '<i data-lucide="moon"></i>';
     if (window.lucide) lucide.createIcons();
 }
 
 /**
- * 1. INITIALIZATION & GENRES
+ * INITIALIZATION & GENRES
  */
 async function fetchGenres() {
     try {
@@ -111,18 +99,35 @@ async function fetchGenres() {
     }
 }
 
+/**
+ * AUTH & COUPLE LOGIC
+ */
 function initAuth() {
     initTheme();
 
-    window.authActions.onAuthStateChanged(window.auth, (user) => {
+    window.authActions.onAuthStateChanged(window.auth, async (user) => {
         currentUser = user;
-        updateAuthUI();
         if (user) {
+            // NOUVEAU: Récupérer ou créer le profil utilisateur pour le Code Couple
+            const userRef = window.fbActions.doc(window.db, 'users', user.uid);
+            const userSnap = await window.fbActions.getDoc(userRef);
+
+            if (userSnap.exists()) {
+                currentCoupleId = userSnap.data().coupleId;
+            } else {
+                // Si c'est un nouveau compte, le coupleId par défaut est son UID
+                currentCoupleId = user.uid;
+                await window.fbActions.setDoc(userRef, { email: user.email, coupleId: currentCoupleId });
+            }
+
+            updateAuthUI();
             initRealtimeSync();
             fetchGenres();
         } else {
+            currentCoupleId = null;
             allMovies = [];
             renderUIList([]);
+            updateAuthUI();
         }
     });
 
@@ -154,7 +159,30 @@ function initAuth() {
             authForm.reset();
         } catch (error) {
             console.error(error);
-            authError.textContent = error.message;
+            authError.textContent = "Erreur: " + error.message;
+        }
+    });
+
+    // Gestion des boutons du Code Couple
+    document.getElementById('copy-code-btn').addEventListener('click', () => {
+        const codeInput = document.getElementById('my-couple-code');
+        codeInput.select();
+        document.execCommand('copy');
+        alert("Code copié ! Envoie-le à ton/ta partenaire.");
+    });
+
+    document.getElementById('join-code-btn').addEventListener('click', async () => {
+        const newCode = document.getElementById('join-couple-code').value.trim();
+        if (newCode && newCode !== currentCoupleId) {
+            if(confirm("Attention : en rejoignant cette liste, tu ne verras plus ta liste actuelle. Continuer ?")) {
+                const userRef = window.fbActions.doc(window.db, 'users', currentUser.uid);
+                await window.fbActions.setDoc(userRef, { coupleId: newCode }, { merge: true });
+                currentCoupleId = newCode;
+                document.getElementById('my-couple-code').value = currentCoupleId;
+                document.getElementById('join-couple-code').value = "";
+                alert("Super ! Tu as rejoint la liste !");
+                initRealtimeSync(); // Recharge la liste avec le nouveau code
+            }
         }
     });
 }
@@ -179,7 +207,7 @@ function updateAuthUI() {
 
         authControls.innerHTML = `
             <div class="user-profile">
-                <div class="user-avatar">
+                <div class="user-avatar" title="${email}">
                     <img src="${avatarUrl}" alt="Avatar">
                 </div>
                 <div class="user-info">
@@ -187,13 +215,18 @@ function updateAuthUI() {
                 </div>
             </div>
         `;
+        
         searchSection.style.display = 'block';
+        coupleDashboard.style.display = 'block';
+        document.getElementById('my-couple-code').value = currentCoupleId || currentUser.uid;
+
     } else {
         authControls.innerHTML = `<button id="login-open-btn" class="login-trigger">Connexion</button>`;
         document.getElementById('login-open-btn').addEventListener('click', () => {
             authModal.classList.add('active');
         });
         searchSection.style.display = 'none';
+        coupleDashboard.style.display = 'none';
     }
 }
 
@@ -202,7 +235,7 @@ window.logout = () => {
 };
 
 /**
- * 2. SEARCH & API
+ * SEARCH & API
  */
 async function searchMovie() {
     if (!currentUser) return;
@@ -212,7 +245,6 @@ async function searchMovie() {
         return;
     }
 
-    // Show skeletons
     resultContainer.innerHTML = `
         <div class="search-results-grid">
             ${Array(4).fill(0).map(() => '<div class="skeleton-card skeleton"></div>').join('')}
@@ -222,8 +254,8 @@ async function searchMovie() {
     try {
         const response = await fetch(`${BASE_URL}/search/movie?api_key=${API_KEY}&query=${encodeURIComponent(query)}&language=fr-FR`);
         const data = await response.json();
-
         const searchResultSection = document.getElementById('search-result');
+        
         if (data.results && data.results.length > 0) {
             searchResultSection.style.display = 'block';
             lastResults = data.results.slice(0, 8);
@@ -262,8 +294,8 @@ function displaySearchResults(movies) {
                                 <button class="add-btn-small" onclick="addFromSearch(${index})">
                                     <i data-lucide="plus"></i> Ajouter
                                 </button>
-                                <button class="trailer-btn" onclick="openTrailer('${movie.id || movie.tmdbId || ''}')">
-                                    <i data-lucide="play"></i> Bande-annonce
+                                <button class="trailer-btn" onclick="openTrailer('${movie.id}')">
+                                    <i data-lucide="play"></i> Trailer
                                 </button>
                             </div>
                         </div>
@@ -281,7 +313,7 @@ window.addFromSearch = function (index) {
 };
 
 /**
- * 2.5 TRAILER LOGIC
+ * TRAILER LOGIC
  */
 async function fetchTrailer(tmdbId) {
     if (!tmdbId || tmdbId === 'undefined' || tmdbId === 'null') return null;
@@ -290,57 +322,36 @@ async function fetchTrailer(tmdbId) {
         if (!response.ok) return null;
 
         const data = await response.json();
-        // Fallback to English if no French trailer
-        let trailer = null;
-        if (data.results) {
-            trailer = data.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
-        }
+        let trailer = data.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
 
         if (!trailer) {
             const resEn = await fetch(`${BASE_URL}/movie/${tmdbId}/videos?api_key=${API_KEY}`);
             if (resEn.ok) {
                 const dataEn = await resEn.json();
-                if (dataEn.results) {
-                    trailer = dataEn.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
-                    if (!trailer) trailer = dataEn.results.find(v => v.site === 'YouTube');
-                }
+                trailer = dataEn.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube') || dataEn.results?.find(v => v.site === 'YouTube');
             }
         }
         return trailer ? trailer.key : null;
     } catch (e) {
-        console.error("Trailer error:", e);
         return null;
     }
 }
 
 window.openTrailer = async function (tmdbId) {
-    console.log("Tentative d'ouverture de la bande-annonce pour l'ID:", tmdbId);
-
     if (!tmdbId || tmdbId === 'undefined' || tmdbId === 'null' || tmdbId === '') {
         trailerModal.classList.add('active');
-        trailerContainer.innerHTML = `
-            <div class="empty-msg">
-                <p>Oups ! L'identifiant de ce film est manquant.</p>
-                <small>Réessaie en rajoutant le film via la recherche.</small>
-            </div>`;
+        trailerContainer.innerHTML = `<div class="empty-msg"><p>Identifiant manquant.</p></div>`;
         return;
     }
 
-    trailerContainer.innerHTML = '<p class="empty-msg">Chargement de la bande-annonce...</p>';
+    trailerContainer.innerHTML = '<p class="empty-msg">Chargement...</p>';
     trailerModal.classList.add('active');
 
     const key = await fetchTrailer(tmdbId);
     if (key) {
-        trailerContainer.innerHTML = `
-            <iframe 
-                src="https://www.youtube.com/embed/${key}?autoplay=1" 
-                frameborder="0" 
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowfullscreen>
-            </iframe>
-        `;
+        trailerContainer.innerHTML = `<iframe src="https://www.youtube.com/embed/${key}?autoplay=1" frameborder="0" allowfullscreen></iframe>`;
     } else {
-        trailerContainer.innerHTML = '<p class="empty-msg">Aucune vidéo trouvée pour ce film sur YouTube.</p>';
+        trailerContainer.innerHTML = '<p class="empty-msg">Aucune vidéo trouvée.</p>';
     }
 };
 
@@ -350,10 +361,10 @@ closeTrailerBtn.addEventListener('click', () => {
 });
 
 /**
- * 3. FIREBASE ACTIONS
+ * FIREBASE ACTIONS
  */
 async function addToFirebase(movie) {
-    if (!currentUser) return;
+    if (!currentUser || !currentCoupleId) return;
     try {
         const movieData = {
             title: movie.title,
@@ -364,6 +375,7 @@ async function addToFirebase(movie) {
             addedAt: Date.now(),
             addedBy: currentUser.email,
             addedById: currentUser.uid,
+            coupleId: currentCoupleId, // NOUVEAU: On associe le film au couple !
             genre_ids: movie.genre_ids || [],
             genres: (movie.genre_ids || []).map(id => genreMap[id] || 'Autre'),
             tmdbId: movie.id
@@ -372,6 +384,7 @@ async function addToFirebase(movie) {
         await window.fbActions.addDoc(window.moviesCol, movieData);
         searchInput.value = "";
         resultContainer.innerHTML = "";
+        document.getElementById('search-result').style.display = 'none';
     } catch (e) {
         console.error("Erreur Firebase:", e);
     }
@@ -389,7 +402,7 @@ window.removeFromList = async function (firebaseId) {
 };
 
 /**
- * 4. MODAL & RATING
+ * MODAL & RATING
  */
 window.openRatingModal = function (firebaseId) {
     currentMovieToFinish = firebaseId;
@@ -429,7 +442,7 @@ saveRatingBtn.addEventListener('click', async () => {
 });
 
 /**
- * 5. FILTERING & SORTING
+ * FILTERING & SORTING
  */
 function applyFilters() {
     let filtered = allMovies.filter(m => {
@@ -447,35 +460,19 @@ function applyFilters() {
         if (field === 'title') {
             return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
-
         return order === 'desc' ? valB - valA : valA - valB;
     });
 
     renderUIList(filtered);
 }
 
-localSearchInput.addEventListener('input', (e) => {
-    localSearchQuery = e.target.value;
-    applyFilters();
-});
-
-genreFilterSelect.addEventListener('change', (e) => {
-    currentGenreFilter = e.target.value;
-    applyFilters();
-});
-
-statusFilterSelect.addEventListener('change', (e) => {
-    currentStatusFilter = e.target.value;
-    applyFilters();
-});
-
-sortFilterSelect.addEventListener('change', (e) => {
-    currentSort = e.target.value;
-    applyFilters();
-});
+localSearchInput.addEventListener('input', (e) => { localSearchQuery = e.target.value; applyFilters(); });
+genreFilterSelect.addEventListener('change', (e) => { currentGenreFilter = e.target.value; applyFilters(); });
+statusFilterSelect.addEventListener('change', (e) => { currentStatusFilter = e.target.value; applyFilters(); });
+sortFilterSelect.addEventListener('change', (e) => { currentSort = e.target.value; applyFilters(); });
 
 /**
- * 6. RANDOMIZER
+ * RANDOMIZER
  */
 function pickRandom() {
     const toWatch = allMovies.filter(m => m.status === 'watching');
@@ -484,19 +481,15 @@ function pickRandom() {
         return;
     }
     const winner = toWatch[Math.floor(Math.random() * toWatch.length)];
-    displayRandomResult(winner);
-}
-
-function displayRandomResult(movie) {
-    const poster = movie.poster_path ? `${IMAGE_BASE_URL}${movie.poster_path}` : PLACEHOLDER;
+    const poster = winner.poster_path ? `${IMAGE_BASE_URL}${winner.poster_path}` : PLACEHOLDER;
     randomResultContainer.innerHTML = `
         <div class="movie-card mini">
             <div class="card-image">
-                <img src="${poster}" alt="${movie.title}">
+                <img src="${poster}" alt="${winner.title}">
             </div>
             <div class="card-info">
-                <h3>${movie.title}</h3>
-                <p class="meta">${movie.release_date.split('-')[0]}</p>
+                <h3>${winner.title}</h3>
+                <p class="meta">${winner.release_date ? winner.release_date.split('-')[0] : ''}</p>
             </div>
         </div>
     `;
@@ -511,14 +504,20 @@ closeRandomBtn.addEventListener('click', () => {
 });
 
 /**
- * 7. SYNC & RENDERING
+ * SYNC & RENDERING
  */
 let unsubscribeSync = null;
 
 function initRealtimeSync() {
     if (unsubscribeSync) unsubscribeSync();
+    if (!currentCoupleId) return;
 
-    const q = window.fbActions.query(window.moviesCol, window.fbActions.orderBy('addedAt', 'desc'));
+    // NOUVEAU: Requête filtrée par coupleId !
+    const q = window.fbActions.query(
+        window.moviesCol, 
+        window.fbActions.where('coupleId', '==', currentCoupleId),
+        window.fbActions.orderBy('addedAt', 'desc')
+    );
 
     unsubscribeSync = window.fbActions.onSnapshot(q, (snapshot) => {
         allMovies = snapshot.docs.map(doc => ({
@@ -539,34 +538,23 @@ function updateStats() {
     }
     statsRow.style.display = 'grid';
 
-    // Total films
     document.getElementById('stat-total').textContent = allMovies.length;
-
-    // Estimate time (120 mins average per movie)
     const finishedCount = allMovies.filter(m => m.status === 'finished').length;
-    const totalMinutes = finishedCount * 120;
-    const hours = Math.floor(totalMinutes / 60);
-    document.getElementById('stat-time').textContent = `${hours}h`;
+    document.getElementById('stat-time').textContent = `${Math.floor((finishedCount * 120) / 60)}h`;
 
-    // Favorite Genre
     const genreCounts = {};
-    allMovies.forEach(m => {
-        (m.genres || []).forEach(g => {
-            genreCounts[g] = (genreCounts[g] || 0) + 1;
-        });
-    });
-    const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
-    document.getElementById('stat-genre').textContent = topGenre ? topGenre[0] : '-';
-
-    // Top Contributor
     const userCounts = {};
     allMovies.forEach(m => {
+        (m.genres || []).forEach(g => genreCounts[g] = (genreCounts[g] || 0) + 1);
         if (m.addedBy) {
             const name = m.addedBy.split('@')[0];
             userCounts[name] = (userCounts[name] || 0) + 1;
         }
     });
+    const topGenre = Object.entries(genreCounts).sort((a, b) => b[1] - a[1])[0];
     const topUser = Object.entries(userCounts).sort((a, b) => b[1] - a[1])[0];
+    
+    document.getElementById('stat-genre').textContent = topGenre ? topGenre[0] : '-';
     document.getElementById('stat-user').textContent = topUser ? topUser[0] : '-';
 }
 
@@ -582,7 +570,7 @@ function renderUIList(movies) {
     }
 
     if (movies.length === 0) {
-        myListGrid.innerHTML = '<p class="empty-msg">Aucun film ne correspond à vos critères.</p>';
+        myListGrid.innerHTML = '<p class="empty-msg">Aucun film dans cette liste.</p>';
         return;
     }
 
@@ -613,7 +601,7 @@ function renderUIList(movies) {
                     
                     <div class="card-actions">
                         <button class="trailer-btn" onclick="openTrailer('${movie.tmdbId || movie.id || ''}')">
-                            <i data-lucide="play"></i> Bande-annonce
+                            <i data-lucide="play"></i> Trailer
                         </button>
 
                         ${!isFinished ? `
